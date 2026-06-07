@@ -15,7 +15,6 @@ Spring Boot + Vue 3 前后端分离电商项目，支持商品浏览、购物车
 
 ### 1. 克隆项目
 
-git clone https://github.com/你的用户名/shop.git
 cd shop
 
 ### 2. 初始化数据库
