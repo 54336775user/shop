@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eample.shop.mapper.ProductMapper">
+    <resultMap id="ProductMap" type="com.eample.shop.entity.Product">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="price" property="price"/>
+        <result column="stock" property="stock"/>
+        <result column="image" property="image"/>
+        <result column="description" property="description"/>
+        <result column="status" property="status"/>
+        <result column="is_flash_sale" property="isFlashSale"/>
+        <result column="flash_price" property="flashPrice"/>
+        <result column="flash_stock" property="flashStock"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="flash_start_time" property="flashStartTime"/>
+        <result column="flash_end_time" property="flashEndTime"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, name, category_id, price, stock, image, description,
+    status, is_flash_sale, flash_price, flash_stock, flash_start_time, flash_end_time,create_time, update_time
+    </sql>
+    <update id="update">
+        UPDATE product
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name},
+            </if>
+            <if test="categoryId != null">
+                category_id = #{categoryId},
+            </if>
+            <if test="price != null">
+                price = #{price},
+            </if>
+            <if test="stock != null">
+                stock = #{stock},
+            </if>
+            <if test="image != null">
+                image = #{image},
+            </if>
+            <if test="description != null">
+                description = #{description},
+            </if>
+            <if test="status != null">
+                status = #{status},
+            </if>
+            <if test="isFlashSale != null">
+                is_flash_sale = #{isFlashSale},
+            </if>
+            <if test="flashPrice != null">
+                flash_price = #{flashPrice},
+            </if>
+            <if test="flashStock != null">
+                flash_stock = #{flashStock},
+            </if>
+            <if test="flashStartTime != null">
+                flash_start_time = #{flashStartTime},
+            </if>
+            <if test="flashEndTime != null">
+                flash_end_time = #{flashEndTime},
+            </if>
+            update_time = #{updateTime}
+        </set>
+        WHERE id = #{id}
+    </update>
+    <update id="updateStatus">
+        update product
+        set status=#{status}
+            , update_time = now()
+        where id=#{id}
+    </update>
+    <update id="decreaseStock">
+        update product
+        set stock=stock-#{quantity},
+            update_time = now()
+        where
+            id=#{productId}
+            and status=1
+            and stock &gt;= #{quantity}
+    </update>
+    <update id="increaseStock">
+        update product
+        set stock=stock+#{quantity},
+            update_time= now()
+        where id=#{productId}
+    </update>
+    <update id="decreaseFlashStock">
+        UPDATE product
+        SET flash_stock = flash_stock - #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND flash_stock >= #{quantity}
+          AND is_flash_sale = 1
+    </update>
+    <update id="increaseFlashStock">
+        UPDATE product
+        SET flash_stock = flash_stock + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND is_flash_sale = 1
+    </update>
+    <delete id="deleteById">
+        DELETE FROM product WHERE id = #{id}
+    </delete>
+    <select id="findOnShelf" resultMap="ProductMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM product
+        WHERE status = 1
+        ORDER BY id DESC
+    </select>
+    <select id="findFlashSale" resultMap="ProductMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM product
+        WHERE status = 1
+          AND is_flash_sale = 1
+          AND flash_start_time &lt;= NOW()
+          AND flash_end_time &gt;= NOW()
+          AND flash_stock &gt; 0
+        ORDER BY id DESC
+    </select>
+    <select id="findVisibleFlashSale" resultMap="ProductMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM product
+        WHERE status = 1
+          AND is_flash_sale = 1
+          AND flash_stock &gt; 0
+          AND flash_end_time &gt;= NOW()
+          AND flash_start_time &lt;= DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+        ORDER BY flash_start_time ASC
+    </select>
+    <select id="findAll" resultMap="ProductMap">
+        select <include refid="Base_Column_List"/>
+        from product
+    </select>
+    <select id="findByCategoryId" resultMap="ProductMap">
+        select <include refid="Base_Column_List"/>
+        from product
+        where category_id = #{categoryId}
+    </select>
+    <select id="findById" resultMap="ProductMap">
+        select <include refid="Base_Column_List"/>
+        from product
+        where id = #{id}
+    </select>
+    <select id="countByCategoryId" resultType="int">
+        select count(*) from product
+        where category_id = #{categoryId}
+    </select>
+    <select id="countSearch" resultType="long">
+        select count(*)
+        from product p
+        left join category c on p.category_id = c.id
+        <where>
+            p.status = 1
+            <if test="keyword != null and keyword != ''">
+                and (
+                p.name like concat('%',#{keyword},'%')
+                or p.description like concat('%',#{keyword},'%')
+                or c.name like concat('%',#{keyword},'%')
+                )
+            </if>
+            <if test="categoryId != null">
+                and p.category_id = #{categoryId}
+            </if>
+            <if test="flashSale != null and flashSale">
+                and p.is_flash_sale = 1
+            </if>
+        </where>
+    </select>
+    <select id="countAdminSearch" resultType="long">
+        select count(*)
+        from product p
+        left join category c on p.category_id = c.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                and (
+                p.name like concat('%',#{keyword},'%')
+                or p.description like concat('%',#{keyword},'%')
+                or c.name like concat('%',#{keyword},'%')
+                )
+            </if>
+            <if test="categoryId != null">
+                and p.category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                and p.status = #{status}
+            </if>
+            <if test="flashSale != null and flashSale">
+                and p.is_flash_sale = 1
+            </if>
+        </where>
+    </select>
+    <select id="search" resultMap="ProductMap">
+        select p.id, p.name, p.category_id, p.price, p.stock, p.image, p.description,
+               p.status, p.is_flash_sale, p.flash_price, p.flash_stock, p.create_time, p.update_time
+        from product p
+        left join category c on p.category_id = c.id
+        <where>
+            p.status =1
+            <if test="keyword != null and keyword != ''">
+                and (
+                p.name like concat('%',#{keyword},'%')
+                or p.description like concat('%',#{keyword},'%')
+                or c.name like concat('%',#{keyword},'%')
+                )
+            </if>
+            <if test="categoryId != null">
+                AND p.category_id = #{categoryId}
+            </if>
+            <if test="flashSale != null and flashSale">
+                AND p.is_flash_sale = 1
+            </if>
+        </where>
+        order by p.id desc
+        limit #{offset},#{size}
+    </select>
+    <select id="adminsearch" resultMap="ProductMap">
+        select p.id, p.name, p.category_id, p.price, p.stock, p.image, p.description,
+               p.status, p.is_flash_sale, p.flash_price, p.flash_stock, p.flash_start_time, p.flash_end_time,p.create_time, p.update_time
+        from product p
+        left join category c on p.category_id = c.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                and (
+                p.name like concat('%',#{keyword},'%')
+                or p.description like concat('%',#{keyword},'%')
+                or c.name like concat('%',#{keyword},'%')
+                )
+            </if>
+            <if test="categoryId != null">
+                and p.category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                and p.status = #{status}
+            </if>
+            <if test="flashSale != null and flashSale">
+                and p.is_flash_sale = 1
+            </if>
+        </where>
+        order by p.id desc
+        limit #{offset},#{size}
+    </select>
+    <select id="getByIds" resultType="com.eample.shop.entity.Product">
+        select <include refid="Base_Column_List"/> from product
+        where id in
+        <foreach collection="productIds" item="productid" open="(" close=")" separator=",">
+            #{productid}
+        </foreach>
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product (
+            name, category_id, price, stock, image, description,
+            status, is_flash_sale, flash_price, flash_stock, flash_start_time, flash_end_time,create_time, update_time
+        ) VALUES (
+                     #{name}, #{categoryId}, #{price}, #{stock}, #{image}, #{description},
+                     #{status}, #{isFlashSale}, #{flashPrice}, #{flashStock},#{flashStartTime},#{flashEndTime}, #{createTime}, #{updateTime}
+                 )
+    </insert>
+</mapper>

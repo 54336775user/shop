@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eample.shop.mapper.MqDeadLetterMapper">
+
+    <resultMap id="MqDeadLetterMap" type="com.eample.shop.entity.MqDeadLetter">
+        <id column="id" property="id"/>
+        <result column="biz_type" property="bizType"/>
+        <result column="request_id" property="requestId"/>
+        <result column="user_id" property="userId"/>
+        <result column="product_id" property="productId"/>
+        <result column="message_body" property="messageBody"/>
+        <result column="fail_reason" property="failReason"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="status" property="status"/>
+        <result column="handler_admin_id" property="handlerAdminId"/>
+        <result column="handle_remark" property="handleRemark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="handle_time" property="handleTime"/>
+    </resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mq_dead_letter
+        (biz_type, request_id, user_id, product_id, message_body, fail_reason,
+         retry_count, status, create_time, update_time)
+        VALUES
+            (#{bizType}, #{requestId}, #{userId}, #{productId}, #{messageBody}, #{failReason},
+             #{retryCount}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+    <select id="findById" resultMap="MqDeadLetterMap">
+        SELECT *
+        FROM mq_dead_letter
+        WHERE id = #{id}
+            LIMIT 1
+    </select>
+    <select id="findByRequestId" resultMap="MqDeadLetterMap">
+        SELECT *
+        FROM mq_dead_letter
+        WHERE request_id = #{requestId}
+            LIMIT 1
+    </select>
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(1)
+        FROM mq_dead_letter
+        WHERE status = #{status}
+    </select>
+    <select id="listByStatus" resultMap="MqDeadLetterMap">
+        SELECT *
+        FROM mq_dead_letter
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+            LIMIT #{offset}, #{pageSize}
+    </select>
+    <update id="markProcessing">
+        UPDATE mq_dead_letter
+        SET status = 1,
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status = 0
+    </update>
+    <update id="markDone">
+        UPDATE mq_dead_letter
+        SET status = 2,
+            handler_admin_id = #{handlerAdminId},
+            handle_remark = #{handleRemark},
+            handle_time = NOW(),
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status IN (0, 1)
+    </update>
+</mapper>

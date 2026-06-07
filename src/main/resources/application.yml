@@ -1,0 +1,62 @@
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false   # 关键：最终失败不要回主队列
+        retry:
+          enabled: true
+          initial-interval: 2000          # 第一次重试等 2 秒
+          multiplier: 2.0               # 指数退避：2s, 4s
+          max-interval: 10000
+          max-retries: 3
+  application:
+    name: shop
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/supershop?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 30000
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 3000ms
+
+shop:
+  cache:
+    product-list-ttl: 300
+  demo:
+    seed-enabled: true
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.eample.shop.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    com.eample.shop: debug
+jwt:
+  secret: your-256-bit-secret-key-change-me-in-production-123456
+  expiration: 86400000   # 24 小时，毫秒

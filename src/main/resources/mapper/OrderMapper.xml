@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eample.shop.mapper.OrderMapper">
+    <resultMap id="ShopOrderMap" type="com.eample.shop.entity.ShopOrder">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="total_amount" property="totalAmount"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, order_no, user_id, total_amount, status, create_time, update_time
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        insert into `order`
+            (order_no, user_id, total_amount, status, create_time, update_time)
+        values
+            (#{orderNo}, #{userId}, #{totalAmount}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+    <select id="findById" resultMap="ShopOrderMap">
+        select <include refid="Base_Column_List"/> from `order`
+        where id=#{id}
+        limit 1
+    </select>
+    <select id="findByIdAndUserId" resultMap="ShopOrderMap">
+        select <include refid="Base_Column_List"/> from `order`
+        where id = #{id}
+        and user_id = #{userId}
+        limit 1
+    </select>
+    <select id="listByUserId" resultMap="ShopOrderMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM `order`
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC, id DESC
+    </select>
+    <select id="adminSearch" resultType="com.eample.shop.entity.ShopOrder">
+        select <include refid="Base_Column_List"/> from `order`
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+            <if test="realKeyword !=null and realKeyword != ''">
+                and order_no like concat('%',#{realKeyword},'%')
+            </if>
+        </where>
+        order by id desc
+        limit #{offset},#{pageSize}
+    </select>
+    <select id="countAdminSearch" resultType="java.lang.Long">
+        select count(*) from `order`
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+            <if test="realKeyword !=null and realKeyword != ''">
+                and order_no like concat('%',#{realKeyword},'%')
+            </if>
+        </where>
+    </select>
+    <update id="updateStatus">
+        UPDATE `order`
+        SET status = #{status},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND user_id = #{userId}
+    </update>
+    <select id="findExpiredUnpaidOrders" resultMap="ShopOrderMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM `order`
+        WHERE status = #{status}
+        AND create_time &lt; #{cutoff}
+        ORDER BY create_time ASC
+    </select>
+    <select id="findExpiredUnpaidOrdersByUserId" resultMap="ShopOrderMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM `order`
+        WHERE user_id = #{userId}
+          AND status = #{status}
+          AND create_time &lt; #{cutoff}
+        ORDER BY create_time ASC
+    </select>
+    <update id="updateStatusById">
+        UPDATE `order`
+        SET status = #{status},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

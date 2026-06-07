@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eample.shop.mapper.CartItemMapper">
+
+    <resultMap id="CartItemMap" type="com.eample.shop.entity.CartItem">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="product_id" property="productId"/>
+        <result column="quantity" property="quantity"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, user_id, product_id, quantity, create_time, update_time
+    </sql>
+    <select id="findById" resultMap="CartItemMap">
+        select <include refid="Base_Column_List"/> from cart_item
+        where id=#{id}
+        limit 1
+    </select>
+    <select id="findByUserIdAndProductId" resultMap="CartItemMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM cart_item
+        WHERE user_id = #{userId}
+          AND product_id = #{productId}
+            LIMIT 1
+    </select>
+    <select id="listByUserId" resultType="com.eample.shop.vo.CartItemVO">
+        SELECT
+            c.id           AS cartItemId,
+            c.product_id   AS productId,
+            p.name         AS productName,
+            p.image        AS productImage,
+            p.price        AS price,
+            c.quantity     AS quantity,
+            p.stock        AS stock,
+            p.status       AS status,
+            c.create_time  AS createTime
+        from cart_item c
+        inner join product p on p.id = c.product_id
+        where c.user_id=#{userId}
+        order by c.update_time DESC, c.id DESC
+    </select>
+    <select id="findByIdsAndUserId" resultMap="CartItemMap">
+        SELECT id, user_id, product_id, quantity, create_time, update_time
+        FROM cart_item
+        WHERE user_id = #{userId}
+        AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cart_item (user_id, product_id, quantity, create_time, update_time)
+        VALUES (#{userId}, #{productId}, #{quantity}, #{createTime}, #{updateTime})
+    </insert>
+    <update id="updateQuantity">
+        UPDATE cart_item
+        SET quantity = #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND user_id = #{userId}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM cart_item
+        WHERE id = #{id}
+          AND user_id = #{userId}
+    </delete>
+    <delete id="deleteByIds">
+        DELETE FROM cart_item
+        WHERE user_id = #{userId}
+        AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>
