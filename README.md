@@ -40,6 +40,3 @@ npm install
 npm run dev
 # 前端地址：http://localhost:5173
 
-## 默认账号
-
-（如有测试账号，在这里写清楚，例如 admin / 123456）
