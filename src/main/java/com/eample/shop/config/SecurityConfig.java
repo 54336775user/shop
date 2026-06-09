@@ -51,6 +51,9 @@ public class SecurityConfig {
                                 "/api/product/flash-sale",
                                 "/api/product/category/**",
                                 "/api/product/*",
+                                "/api/group-buy/activity/**",
+                                "/api/group-buy/product/**",
+                                "/api/group-buy/team/**",
                                 "/api/seckill/list")
                         .permitAll()
                         // 4. 其它接口默认要登录

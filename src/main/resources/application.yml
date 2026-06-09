@@ -1,9 +1,9 @@
 spring:
   rabbitmq:
-    host: #你的rabbitmq地址
-    port: #你的rabbitmq端口
-    username: #你的rabbitmq用户名
-    password: #你的rabbitmq密码
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
     listener:
       simple:
         acknowledge-mode: auto
@@ -18,9 +18,9 @@ spring:
     name: shop
 
   datasource:
-    url: #你的mysql地址
-    username: #你的mysql用户名
-    password: #你的mysql密码
+    url: jdbc:mysql://localhost:3306/supershop?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       minimum-idle: 5
@@ -31,9 +31,9 @@ spring:
 
   data:
     redis:
-      host: #你的redis地址
-      port: #你的redis端口
-      database: #你的redis数据库
+      host: localhost
+      port: 6379
+      database: 0
       timeout: 3000ms
 
 shop:
@@ -58,5 +58,5 @@ logging:
   level:
     com.eample.shop: debug
 jwt:
-  secret: #你的jwt密钥
+  secret: your-256-bit-secret-key-change-me-in-production-123456
   expiration: 86400000   # 24 小时，毫秒

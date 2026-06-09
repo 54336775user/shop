@@ -26,6 +26,9 @@
                 <el-tag v-if="order.orderType === 2" type="danger" effect="plain" size="small" class="seckill-tag">
                   秒杀
                 </el-tag>
+                <el-tag v-if="order.orderType === 3" type="warning" effect="plain" size="small" class="group-buy-tag">
+                  拼团
+                </el-tag>
               </div>
               <div class="order-time">下单时间：{{ formatDateTime(order.createTime) }}</div>
             </div>
@@ -86,6 +89,9 @@
               {{ detailData.orderNo }}
               <el-tag v-if="detailData.orderType === 2" type="danger" effect="plain" size="small" class="seckill-tag">
                 秒杀
+              </el-tag>
+              <el-tag v-if="detailData.orderType === 3" type="warning" effect="plain" size="small" class="group-buy-tag">
+                拼团
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="状态">
@@ -297,8 +303,8 @@ const goPay = (order) => {
   if (!orderId) {
     return
   }
-  const query = typeof order === 'object' && order.orderType === ORDER_TYPE_SECKILL
-    ? { orderType: ORDER_TYPE_SECKILL }
+  const query = typeof order === 'object' && [ORDER_TYPE_SECKILL, 3].includes(Number(order.orderType))
+    ? { orderType: Number(order.orderType) }
     : {}
   router.push({ path: `/pay/${orderId}`, query })
 }
@@ -403,6 +409,10 @@ onMounted(async () => {
 }
 
 .seckill-tag {
+  vertical-align: middle;
+}
+
+.group-buy-tag {
   vertical-align: middle;
 }
 

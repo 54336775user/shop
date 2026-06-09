@@ -1,6 +1,7 @@
 package com.eample.shop.Service.impl;
 
 import com.eample.shop.Service.OrderExpireService;
+import com.eample.shop.Service.GroupBuyService;
 import com.eample.shop.Service.OrderService;
 import com.eample.shop.Service.ProductService;
 import com.eample.shop.cache.ProductCacheService;
@@ -35,6 +36,7 @@ public class OrderServiceimpl implements OrderService {
     private static final int STATUS_CANCELLED = 4;
     private static final int ORDER_TYPE_NORMAL = 1;
     private static final int ORDER_TYPE_SECKILL = 2;
+    private static final int ORDER_TYPE_GROUP = 3;
     private static final int SECKILL_STATUS_UNPAID = 0;
     private static final int SECKILL_STATUS_PAID = 1;
     private static final int SECKILL_STATUS_CANCELLED = 2;
@@ -48,6 +50,8 @@ public class OrderServiceimpl implements OrderService {
     private static final String ORDER_TOKEN_PREFIX = "shop:order:token:";
     private final DefaultRedisScript<Long> orderTokenScript;
     private final SeckillOrderMapper seckillOrderMapper;
+    private final GroupBuyOrderMapper groupBuyOrderMapper;
+    private final GroupBuyService groupBuyService;
     private final OrderExpireService orderExpireService;
 
     @Override
@@ -114,6 +118,7 @@ public class OrderServiceimpl implements OrderService {
 
         List<ShopOrder> orders = orderMapper.listByUserId(userId);
         List<SeckillOrder> seckillOrders = seckillOrderMapper.listByUserId(userId);
+        List<GroupBuyOrder> groupBuyOrders = groupBuyOrderMapper.listByUserId(userId);
 
         List<OrderVO> result = new ArrayList<>();
 
@@ -136,6 +141,12 @@ public class OrderServiceimpl implements OrderService {
             result.add(secToOrderVO(seckillOrder));
         }
 
+        for (GroupBuyOrder groupBuyOrder : groupBuyOrders) {
+            result.add(groupBuyToOrderVO(groupBuyOrder));
+        }
+
+        //拼单订单
+
         // 按下单时间倒序
         result.sort((a, b) -> b.getCreateTime().compareTo(a.getCreateTime()));
         return result;
@@ -152,6 +163,14 @@ public class OrderServiceimpl implements OrderService {
             SeckillOrder seckillOrder = seckillOrderMapper.findByIdAndUserId(orderId, userId);
             if (seckillOrder != null) {
                 return toSeckillDetailVO(seckillOrder);
+            }
+            throw new RuntimeException("订单不存在");
+        }
+
+        if (Integer.valueOf(ORDER_TYPE_GROUP).equals(orderType)) {
+            GroupBuyOrder groupBuyOrder = groupBuyOrderMapper.findByIdAndUserId(orderId, userId);
+            if (groupBuyOrder != null) {
+                return toGroupBuyDetailVO(groupBuyOrder);
             }
             throw new RuntimeException("订单不存在");
         }
@@ -187,6 +206,11 @@ public class OrderServiceimpl implements OrderService {
     public void cancel(Long userId, Long orderId, Integer orderType) {
         if (Integer.valueOf(ORDER_TYPE_SECKILL).equals(orderType)) {
             cancelSeckillOrder(userId, orderId);
+            return;
+        }
+
+        if (Integer.valueOf(ORDER_TYPE_GROUP).equals(orderType)) {
+            groupBuyService.cancelUnpaidOrder(userId, orderId);
             return;
         }
 
@@ -236,6 +260,11 @@ public class OrderServiceimpl implements OrderService {
             return;
         }
 
+        if (Integer.valueOf(ORDER_TYPE_GROUP).equals(orderType)) {
+            groupBuyService.payOrder(userId, orderId);
+            return;
+        }
+
         ShopOrder order = orderMapper.findByIdAndUserId(orderId, userId);
         if (order != null) {
             if (!Integer.valueOf(STATUS_UNPAID).equals(order.getStatus())) {
@@ -260,6 +289,46 @@ public class OrderServiceimpl implements OrderService {
         throw new RuntimeException("订单不存在");
     }
 
+    private OrderVO groupBuyToOrderVO(GroupBuyOrder order) {
+        OrderVO vo = new OrderVO();
+        vo.setId(order.getId());
+        vo.setOrderNo(order.getOrderNo());
+        vo.setTotalAmount(order.getTotalAmount());
+        vo.setStatus(order.getStatus());
+        vo.setStatusText(groupBuyStatusText(order.getStatus()));
+        vo.setCreateTime(order.getCreateTime());
+        vo.setOrderType(ORDER_TYPE_GROUP);
+        vo.setItems(List.of(toGroupBuyOrderItemVO(order)));
+        return vo;
+    }
+
+    private OrderDetailVO toGroupBuyDetailVO(GroupBuyOrder order) {
+        OrderDetailVO vo = new OrderDetailVO();
+        vo.setId(order.getId());
+        vo.setOrderNo(order.getOrderNo());
+        vo.setUserId(order.getUserId());
+        vo.setTotalAmount(order.getTotalAmount());
+        vo.setStatus(order.getStatus());
+        vo.setStatusText(groupBuyStatusText(order.getStatus()));
+        vo.setCreateTime(order.getCreateTime());
+        vo.setUpdateTime(order.getUpdateTime());
+        vo.setOrderType(ORDER_TYPE_GROUP);
+        vo.setItems(List.of(toGroupBuyOrderItemVO(order)));
+        return vo;
+    }
+
+    private OrderItemVO toGroupBuyOrderItemVO(GroupBuyOrder order) {
+        OrderItemVO item = new OrderItemVO();
+        item.setId(order.getId());
+        item.setProductId(order.getProductId());
+        item.setProductName(order.getProductName());
+        item.setProductImage(order.getProductImage());
+        item.setPrice(order.getGroupPrice());
+        item.setQuantity(order.getQuantity());
+        item.setAmount(order.getTotalAmount());
+        return item;
+    }
+
     private void checkAndConsumeToken(Long userId, String token) {
         if (!StringUtils.hasText(token)) {
             throw new RuntimeException("请勿重复提交");
@@ -280,7 +349,8 @@ public class OrderServiceimpl implements OrderService {
             return list;
         }
         if (request.getProductId() != null) {
-            int quantity = request.getQuantity() == null || request.getQuantity() < 1 ? 1 : request.getQuantity();
+            Integer requestedQuantity = request.getQuantity();
+            int quantity = requestedQuantity == null || requestedQuantity < 1 ? 1 : requestedQuantity;
             CartItem temp = new CartItem();
             temp.setProductId(request.getProductId());
             temp.setQuantity(quantity);
@@ -420,6 +490,21 @@ public class OrderServiceimpl implements OrderService {
             case 1 -> "待发货";
             case 2 -> "已取消";
             case 3 -> "已完成";
+            default -> "未知";
+        };
+    }
+
+    private String groupBuyStatusText(Integer status) {
+        if (status == null) {
+            return "未知";
+        }
+        return switch (status) {
+            case 0 -> "待支付";
+            case 1 -> "已支付待成团";
+            case 2 -> "已成团待发货";
+            case 3 -> "已完成";
+            case 4 -> "已取消";
+            case 5 -> "未成团已退款";
             default -> "未知";
         };
     }

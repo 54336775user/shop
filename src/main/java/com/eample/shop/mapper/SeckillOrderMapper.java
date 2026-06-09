@@ -20,6 +20,14 @@ public interface SeckillOrderMapper {
 
     List<SeckillOrder> listByUserId(@Param("userId") Long userId);
 
+    long countAdminSearch(@Param("keyword") String keyword,
+                          @Param("status") Integer status);
+
+    List<SeckillOrder> adminSearch(@Param("keyword") String keyword,
+                                   @Param("status") Integer status,
+                                   @Param("offset") int offset,
+                                   @Param("pageSize") int pageSize);
+
     int updateStatus(@Param("id") Long id,
                      @Param("userId") Long userId,
                      @Param("status") Integer status);

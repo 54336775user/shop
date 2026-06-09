@@ -1,61 +1,77 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.eample.shop.mapper.SeckillOrderMapper">
+<mapper namespace="com.eample.shop.mapper.GroupBuyOrderMapper">
 
-    <resultMap id="SeckillOrderMap" type="com.eample.shop.entity.SeckillOrder">
+    <resultMap id="GroupBuyOrderMap" type="com.eample.shop.entity.GroupBuyOrder">
         <id column="id" property="id"/>
         <result column="order_no" property="orderNo"/>
         <result column="user_id" property="userId"/>
+        <result column="team_id" property="teamId"/>
+        <result column="activity_id" property="activityId"/>
         <result column="product_id" property="productId"/>
         <result column="product_name" property="productName"/>
         <result column="product_image" property="productImage"/>
-        <result column="seckill_price" property="seckillPrice"/>
+        <result column="group_price" property="groupPrice"/>
         <result column="quantity" property="quantity"/>
         <result column="total_amount" property="totalAmount"/>
         <result column="status" property="status"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
+
     <sql id="Base_Column_List">
-        id, order_no, user_id, product_id, product_name, product_image,
-        seckill_price, quantity, total_amount, status, create_time, update_time
+        id, order_no, user_id, team_id, activity_id, product_id, product_name,
+        product_image, group_price, quantity, total_amount, status, create_time, update_time
     </sql>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO seckill_order
-        (order_no, user_id, product_id, product_name, product_image, seckill_price, quantity, total_amount, status, create_time, update_time)
+        INSERT INTO group_buy_order
+        (order_no, user_id, team_id, activity_id, product_id, product_name, product_image,
+         group_price, quantity, total_amount, status, create_time, update_time)
         VALUES
-            (#{orderNo}, #{userId}, #{productId}, #{productName}, #{productImage},
-             #{seckillPrice}, #{quantity}, #{totalAmount}, #{status}, #{createTime}, #{updateTime})
+            (#{orderNo}, #{userId}, #{teamId}, #{activityId}, #{productId}, #{productName}, #{productImage},
+             #{groupPrice}, #{quantity}, #{totalAmount}, #{status}, #{createTime}, #{updateTime})
     </insert>
-    <select id="findById" resultMap="SeckillOrderMap">
+
+    <select id="findById" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE id = #{id}
         LIMIT 1
     </select>
-    <select id="findByOrderNo" resultMap="SeckillOrderMap">
+
+    <select id="findByOrderNo" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE order_no = #{orderNo}
         LIMIT 1
     </select>
-    <select id="findByIdAndUserId" resultMap="SeckillOrderMap">
+
+    <select id="findByIdAndUserId" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE id = #{id}
         AND user_id = #{userId}
         LIMIT 1
     </select>
-    <select id="listByUserId" resultMap="SeckillOrderMap">
+
+    <select id="listByUserId" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE user_id = #{userId}
         ORDER BY create_time DESC, id DESC
     </select>
+
+    <select id="listByTeamId" resultMap="GroupBuyOrderMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM group_buy_order
+        WHERE team_id = #{teamId}
+        ORDER BY create_time ASC, id ASC
+    </select>
     <select id="countAdminSearch" resultType="java.lang.Long">
         SELECT COUNT(*)
-        FROM seckill_order
+        FROM group_buy_order
         <where>
             <if test="status != null">
                 status = #{status}
@@ -65,9 +81,9 @@
             </if>
         </where>
     </select>
-    <select id="adminSearch" resultMap="SeckillOrderMap">
+    <select id="adminSearch" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         <where>
             <if test="status != null">
                 status = #{status}
@@ -79,39 +95,35 @@
         ORDER BY create_time DESC, id DESC
         LIMIT #{offset}, #{pageSize}
     </select>
+
     <update id="updateStatus">
-        UPDATE seckill_order
+        UPDATE group_buy_order
         SET status = #{status},
             update_time = NOW()
         WHERE id = #{id}
-          AND user_id = #{userId}
     </update>
+
     <update id="updateStatusById">
-        UPDATE seckill_order
+        UPDATE group_buy_order
         SET status = #{status},
             update_time = NOW()
         WHERE id = #{id}
     </update>
-    <select id="countUserBought" resultType="int">
-        SELECT COUNT(1)
-        FROM seckill_order
-        WHERE user_id = #{userId}
-          AND product_id = #{productId}
-          AND status != 2
-    </select>
-    <select id="findExpiredUnpaidOrders" resultMap="SeckillOrderMap">
+
+    <select id="findExpiredUnpaidOrders" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE status = #{status}
-          AND create_time &lt; #{cutoff}
+        AND create_time &lt; #{cutoff}
         ORDER BY create_time ASC
     </select>
-    <select id="findExpiredUnpaidOrdersByUserId" resultMap="SeckillOrderMap">
+
+    <select id="findExpiredUnpaidOrdersByUserId" resultMap="GroupBuyOrderMap">
         SELECT <include refid="Base_Column_List"/>
-        FROM seckill_order
+        FROM group_buy_order
         WHERE user_id = #{userId}
-          AND status = #{status}
-          AND create_time &lt; #{cutoff}
+        AND status = #{status}
+        AND create_time &lt; #{cutoff}
         ORDER BY create_time ASC
     </select>
 </mapper>

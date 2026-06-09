@@ -198,7 +198,7 @@ const paymentMethods = [
 const orderId = computed(() => Number(route.params.orderId || route.query.orderId || 0))
 const orderType = computed(() => {
   const value = Number(route.query.orderType || 0)
-  return value === 2 ? 2 : undefined
+  return [2, 3].includes(value) ? value : undefined
 })
 const selectedMethodLabel = computed(
   () => paymentMethods.find(item => item.value === selectedMethod.value)?.title || '支付'
@@ -424,8 +424,8 @@ const handlePay = async () => {
       ElMessage.success(`${selectedMethodLabel.value}支付成功`)
       clearCountdownTimer()
       const query = { newOrderId: orderData.value.id }
-      if (orderData.value.orderType === 2) {
-        query.orderType = 2
+      if ([2, 3].includes(Number(orderData.value.orderType))) {
+        query.orderType = Number(orderData.value.orderType)
       }
       router.replace({
         path: '/orders',

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eample.shop.mapper.GroupBuyActivityMapper">
+
+    <resultMap id="GroupBuyActivityMap" type="com.eample.shop.entity.GroupBuyActivity">
+        <id column="id" property="id"/>
+        <result column="product_id" property="productId"/>
+        <result column="group_price" property="groupPrice"/>
+        <result column="required_size" property="requiredSize"/>
+        <result column="duration_hours" property="durationHours"/>
+        <result column="stock" property="stock"/>
+        <result column="status" property="status"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <resultMap id="GroupBuyActivityAdminMap" type="com.eample.shop.vo.GroupBuyActivityAdminVO">
+        <id column="id" property="id"/>
+        <result column="product_id" property="productId"/>
+        <result column="product_name" property="productName"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="product_price" property="productPrice"/>
+        <result column="group_price" property="groupPrice"/>
+        <result column="required_size" property="requiredSize"/>
+        <result column="duration_hours" property="durationHours"/>
+        <result column="stock" property="stock"/>
+        <result column="status" property="status"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, product_id, group_price, required_size, duration_hours, stock,
+        status, start_time, end_time, create_time, update_time
+    </sql>
+    <sql id="Admin_Column_List">
+        a.id, a.product_id, p.name AS product_name, c.name AS category_name,
+    p.price AS product_price, a.group_price, a.required_size, a.duration_hours,
+    a.stock, a.status, a.start_time, a.end_time, a.create_time, a.update_time
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO group_buy_activity
+        (product_id, group_price, required_size, duration_hours, stock, status, start_time, end_time, create_time, update_time)
+        VALUES
+            (#{productId}, #{groupPrice}, #{requiredSize}, #{durationHours}, #{stock}, #{status},
+             #{startTime}, #{endTime}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="update">
+        UPDATE group_buy_activity
+        SET product_id = #{productId},
+            group_price = #{groupPrice},
+            required_size = #{requiredSize},
+            duration_hours = #{durationHours},
+            stock = #{stock},
+            status = #{status},
+            start_time = #{startTime},
+            end_time = #{endTime},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="findById" resultMap="GroupBuyActivityMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM group_buy_activity
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="findActiveByProductId" resultMap="GroupBuyActivityMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM group_buy_activity
+        WHERE product_id = #{productId}
+        AND status = 1
+        AND (start_time IS NULL OR start_time &lt;= NOW())
+        AND (end_time IS NULL OR end_time &gt;= NOW())
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <update id="decreaseStock">
+        UPDATE group_buy_activity
+        SET stock = stock - #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND stock &gt;= #{quantity}
+    </update>
+
+    <update id="increaseStock">
+        UPDATE group_buy_activity
+        SET stock = stock + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="findAll" resultMap="GroupBuyActivityMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM group_buy_activity
+        ORDER BY id DESC
+    </select>
+
+    <select id="findEnabled" resultMap="GroupBuyActivityMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM group_buy_activity
+        WHERE status = 1
+        ORDER BY id DESC
+    </select>
+
+    <select id="countAdminSearch" resultType="long">
+        SELECT COUNT(1)
+        FROM group_buy_activity a
+        LEFT JOIN product p ON a.product_id = p.id
+        LEFT JOIN category c ON p.category_id = c.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                p.name LIKE CONCAT('%', #{keyword}, '%')
+                OR c.name LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="productId != null">
+                AND a.product_id = #{productId}
+            </if>
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <select id="adminSearch" resultMap="GroupBuyActivityAdminMap">
+        SELECT <include refid="Admin_Column_List"/>
+        FROM group_buy_activity a
+        LEFT JOIN product p ON a.product_id = p.id
+        LEFT JOIN category c ON p.category_id = c.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                p.name LIKE CONCAT('%', #{keyword}, '%')
+                OR c.name LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="productId != null">
+                AND a.product_id = #{productId}
+            </if>
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+        </where>
+        ORDER BY a.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+</mapper>

@@ -28,8 +28,9 @@ export function getAdminOrderList(params = {}) {
   return adminRequest.get('/admin/order/list', { params })
 }
 
-export function getAdminOrderDetail(id) {
-  return adminRequest.get(`/admin/order/${id}`)
+export function getAdminOrderDetail(id, orderType) {
+  const params = orderType ? { orderType } : {}
+  return adminRequest.get(`/admin/order/${id}`, { params })
 }
 
 export function updateAdminOrderStatus(id, status) {

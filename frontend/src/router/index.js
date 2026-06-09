@@ -8,11 +8,13 @@ import CartView from '../views/CartView.vue'
 import OrderListView from '../views/OrderListView.vue'
 import PaymentView from '../views/PaymentView.vue'
 import SeckillView from '../views/SeckillView.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 
 const routes = [
   { path: '/', redirect: '/home' },
   { path: '/login', name: 'Login', component: LoginView },
   { path: '/home', name: 'Home', component: HomeView },
+  { path: '/product/:id', name: 'ProductDetail', component: ProductDetailView },
   { path: '/search', name: 'Search', component: SearchView },
   { path: '/cart', name: 'Cart', component: CartView },
   { path: '/orders', name: 'Orders', component: OrderListView },

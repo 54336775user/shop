@@ -8,7 +8,7 @@ public interface AdminOrderService {
 
     PageResult<OrderVO> list(String keyword, Integer status, Integer page, Integer size);
 
-    OrderDetailVO detail(Long id);
+    OrderDetailVO detail(Long id, Integer orderType);
 
     void updateStatus(Long id, Integer status);
 

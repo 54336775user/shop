@@ -37,7 +37,7 @@
           class="product-col"
         >
           <el-card shadow="hover" class="product-card" :body-style="{ padding: '0px' }">
-            <div class="image-placeholder">
+            <div class="image-placeholder clickable-image" @click="goToProductDetail(product.id)">
               <template v-if="product.image">
                 <img class="cover-image" :src="product.image" :alt="product.name" />
               </template>
@@ -57,8 +57,11 @@
                 <span class="stock-text">库存 {{ product.stock }}</span>
               </div>
               <div class="action-row">
-                <el-button type="primary" size="small" round :icon="ShoppingCart" @click="handleAddToCart(product)">
+                <el-button size="small" round :icon="ShoppingCart" @click.stop="handleAddToCart(product)">
                   加入购物车
+                </el-button>
+                <el-button type="danger" size="small" round :loading="buyingProductId === product.id" @click.stop="handleBuyNow(product)">
+                  立即购买
                 </el-button>
               </div>
             </div>
@@ -83,14 +86,16 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Search, ShoppingCart } from '@element-plus/icons-vue'
-import { addToCart } from '../api/cart'
 import { getPublicProductList } from '../api/product'
 import { getCategoryList } from '../api/category'
 import { useCartCount } from '../composables/useCartCount'
+import { useDirectPurchase } from '../composables/useDirectPurchase'
 
 const route = useRoute()
 const router = useRouter()
 const { cartCount, refreshCartCount: loadCartCount, clearCartCount } = useCartCount()
+const { buyNow, addProductToCart } = useDirectPurchase()
+const buyingProductId = ref(null)
 
 const searchKeyword = ref('')
 const loading = ref(false)
@@ -223,24 +228,23 @@ const goHome = () => {
   router.push('/home')
 }
 
-const handleAddToCart = async (product) => {
-  if (!localStorage.getItem('token')) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
+const goToProductDetail = (productId) => {
+  router.push(`/product/${productId}`)
+}
 
+const handleAddToCart = async (product) => {
+  const success = await addProductToCart(product.id, 1, product.name)
+  if (success) {
+    await loadCartCount()
+  }
+}
+
+const handleBuyNow = async (product) => {
+  buyingProductId.value = product.id
   try {
-    const res = await addToCart({
-      productId: product.id,
-      quantity: 1
-    })
-    if (res.code === 200) {
-      ElMessage.success(`「${product.name}」已加入购物车`)
-      await loadCartCount()
-    }
-  } catch {
-    // request 拦截器会提示错误
+    await buyNow(product.id, 1)
+  } finally {
+    buyingProductId.value = null
   }
 }
 
@@ -460,9 +464,15 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+.clickable-image {
+  cursor: pointer;
+}
+
 .action-row {
   margin-top: 14px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

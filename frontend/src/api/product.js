@@ -17,6 +17,10 @@ export function getPublicProductByCategory(categoryId) {
   return request.get(`/product/category/${categoryId}`)
 }
 
+export function getProductDetail(id) {
+  return request.get(`/product/${id}`)
+}
+
 export function addProduct(data) {
   return adminRequest.post('/admin/product/add', data)
 }

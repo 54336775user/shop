@@ -31,8 +31,9 @@ public class AdminOrderController {
      * 后台订单详情
      */
     @GetMapping("/{id}")
-    public Result<OrderDetailVO> detail(@PathVariable Long id) {
-        return Result.ok(adminOrderService.detail(id));
+    public Result<OrderDetailVO> detail(@PathVariable Long id,
+                                        @RequestParam(required = false) Integer orderType) {
+        return Result.ok(adminOrderService.detail(id, orderType));
     }
 
     /**

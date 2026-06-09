@@ -3,11 +3,13 @@ package com.eample.shop.Service.impl;
 import com.eample.shop.Service.OrderExpireService;
 import com.eample.shop.cache.ProductCacheService;
 import com.eample.shop.entity.OrderItem;
+import com.eample.shop.entity.GroupBuyOrder;
 import com.eample.shop.entity.SeckillOrder;
 import com.eample.shop.entity.ShopOrder;
 import com.eample.shop.mapper.OrderItemMapper;
 import com.eample.shop.mapper.OrderMapper;
 import com.eample.shop.mapper.ProductMapper;
+import com.eample.shop.mapper.GroupBuyOrderMapper;
 import com.eample.shop.mapper.SeckillOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -24,6 +26,7 @@ public class OrderExpireServiceimpl implements OrderExpireService {
     private static final int STATUS_UNPAID = 0;
     private static final int STATUS_CANCELLED = 4;
     private static final int ORDER_TYPE_SECKILL = 2;
+    private static final int ORDER_TYPE_GROUP = 3;
     private static final int SECKILL_STATUS_UNPAID = 0;
     private static final int SECKILL_STATUS_CANCELLED = 2;
     private static final int PAYMENT_TIMEOUT_MINUTES = 15;
@@ -32,6 +35,7 @@ public class OrderExpireServiceimpl implements OrderExpireService {
     private final OrderItemMapper orderItemMapper;
     private final ProductMapper productMapper;
     private final SeckillOrderMapper seckillOrderMapper;
+    private final GroupBuyOrderMapper groupBuyOrderMapper;
     private final ProductCacheService productCacheService;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -74,6 +78,10 @@ public class OrderExpireServiceimpl implements OrderExpireService {
             expireSeckillUnpaidOrder(userId, orderId);
             return;
         }
+        if (Integer.valueOf(ORDER_TYPE_GROUP).equals(orderType)) {
+            expireGroupBuyUnpaidOrder(userId, orderId);
+            return;
+        }
 
         ShopOrder order = orderMapper.findByIdAndUserId(orderId, userId);
         if (order != null) {
@@ -102,6 +110,15 @@ public class OrderExpireServiceimpl implements OrderExpireService {
                 // 单笔失败不影响列表
             }
         }
+        List<GroupBuyOrder> expiredGroup = groupBuyOrderMapper.findExpiredUnpaidOrdersByUserId(
+                userId, STATUS_UNPAID, cutoff);
+        for (GroupBuyOrder order : expiredGroup) {
+            try {
+                doCancelExpiredGroupBuyOrder(order.getId());
+            } catch (RuntimeException ignored) {
+                // 忽略单个失败，继续扫其他订单
+            }
+        }
         List<SeckillOrder> expiredSeckill = seckillOrderMapper.findExpiredUnpaidOrdersByUserId(
                 userId, SECKILL_STATUS_UNPAID, cutoff);
         for (SeckillOrder order : expiredSeckill) {
@@ -116,6 +133,30 @@ public class OrderExpireServiceimpl implements OrderExpireService {
     @Override
     public boolean isPaymentExpired(LocalDateTime createTime) {
         return createTime != null && createTime.isBefore(paymentCutoffTime());
+    }
+
+    private void expireGroupBuyUnpaidOrder(Long userId, Long orderId) {
+        GroupBuyOrder order = groupBuyOrderMapper.findByIdAndUserId(orderId, userId);
+        if (order == null) {
+            return;
+        }
+        if (!Integer.valueOf(STATUS_UNPAID).equals(order.getStatus())) {
+            return;
+        }
+        if (!isPaymentExpired(order.getCreateTime())) {
+            return;
+        }
+        doCancelExpiredGroupBuyOrder(orderId);
+    }
+
+    private void doCancelExpiredGroupBuyOrder(Long orderId) {
+        GroupBuyOrder order = groupBuyOrderMapper.findById(orderId);
+        if (order == null || !Integer.valueOf(STATUS_UNPAID).equals(order.getStatus())) {
+            return;
+        }
+        groupBuyOrderMapper.updateStatusById(orderId, STATUS_CANCELLED);
+        // 未支付拼团订单只做订单取消，不回滚库存；库存是在支付时才扣减的
+        // 成团中的其他成员不受影响，后续由定时任务/支付流继续处理
     }
 
     private LocalDateTime paymentCutoffTime() {

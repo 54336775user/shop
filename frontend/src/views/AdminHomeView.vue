@@ -27,6 +27,9 @@
           <el-icon><Lightning /></el-icon>
           <span>秒杀管理</span>
         </el-menu-item>
+        <el-menu-item index="groupBuy">
+          <span>拼团管理</span>
+        </el-menu-item>
         <el-menu-item index="orders">
           <el-icon><Document /></el-icon>
           <span>订单管理</span>
@@ -307,6 +310,125 @@
           </div>
         </div>
 
+        <div v-if="activeMenu === 'groupBuy'" class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">拼团活动列表</h3>
+              <p class="panel-subtitle">支持新增、编辑、上架与下架拼团活动</p>
+            </div>
+            <div class="panel-actions">
+              <el-input
+                v-model="groupBuySearchKeyword"
+                placeholder="搜索商品名称 / 分类"
+                clearable
+                style="width: 240px"
+                @keyup.enter="loadGroupBuys"
+              />
+              <el-input
+                v-model="groupBuyProductIdFilter"
+                placeholder="商品ID"
+                clearable
+                style="width: 130px"
+                @keyup.enter="loadGroupBuys"
+              />
+              <el-select
+                v-model="groupBuyStatusFilter"
+                placeholder="状态"
+                clearable
+                style="width: 140px"
+                @change="loadGroupBuys"
+              >
+                <el-option
+                  v-for="item in groupBuyStatusOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+              <el-button :loading="groupBuyLoading" @click="refreshGroupBuys">刷新</el-button>
+              <el-button type="primary" :icon="Plus" @click="openAddGroupBuyDialog">新增拼团活动</el-button>
+            </div>
+          </div>
+
+          <el-alert
+            title="拼团活动默认按商品维度配置，商品必须处于上架状态且不能是秒杀商品。"
+            type="info"
+            show-icon
+            :closable="false"
+            class="group-buy-alert"
+          />
+
+          <el-table
+            :data="groupBuyData"
+            border
+            style="width: 100%"
+            v-loading="groupBuyLoading"
+            element-loading-text="拼团活动加载中..."
+            :empty-text="groupBuyLoading ? '正在加载拼团活动...' : '暂无拼团活动'"
+          >
+            <el-table-column prop="id" label="活动ID" width="90" />
+            <el-table-column label="商品信息" min-width="220">
+              <template #default="{ row }">
+                <div class="group-buy-product-cell">
+                  <div class="group-buy-product-name">{{ row.productName || `商品 #${row.productId}` }}</div>
+                  <div class="group-buy-product-subtitle">
+                    {{ row.categoryName || '-' }} · 商品ID {{ row.productId }}
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="价格" min-width="180">
+              <template #default="{ row }">
+                <div class="group-buy-price-cell">
+                  <span class="group-buy-price-current">拼团价 ¥{{ formatMoney(row.groupPrice) }}</span>
+                  <span class="group-buy-price-original">原价 ¥{{ formatMoney(row.productPrice) }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="requiredSize" label="成团人数" width="100" />
+            <el-table-column prop="durationHours" label="时长(小时)" width="110" />
+            <el-table-column prop="stock" label="库存" width="90" />
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="Number(row.status) === 1 ? 'success' : 'info'">
+                  {{ row.statusText || (Number(row.status) === 1 ? '进行中' : '已下架') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="活动时间" min-width="200">
+              <template #default="{ row }">
+                <div class="group-buy-meta">
+                  <div>开始：{{ formatDateTime(row.startTime) }}</div>
+                  <div>结束：{{ formatDateTime(row.endTime) }}</div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="190" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click="openEditGroupBuyDialog(row)">编辑</el-button>
+                <el-button
+                  size="small"
+                  :type="Number(row.status) === 1 ? 'warning' : 'success'"
+                  @click="toggleGroupBuyStatus(row)"
+                >
+                  {{ Number(row.status) === 1 ? '下架' : '上架' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-row">
+            <el-pagination
+              v-model:current-page="groupBuyCurrentPage"
+              v-model:page-size="groupBuyPageSize"
+              :page-sizes="[5, 10, 20]"
+              :total="groupBuyTotal"
+              layout="total, sizes, prev, pager, next, jumper"
+              background
+            />
+          </div>
+        </div>
+
         <div v-if="activeMenu === 'orders'" class="panel">
           <div class="panel-header">
             <div>
@@ -349,6 +471,13 @@
           >
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="orderNo" label="订单号" min-width="200" />
+            <el-table-column label="类型" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getOrderTypeTagType(row.orderType)" effect="plain">
+                  {{ getOrderTypeText(row.orderType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="userId" label="用户ID" width="100" />
             <el-table-column label="订单金额" width="120">
               <template #default="{ row }">¥ {{ formatMoney(row.totalAmount) }}</template>
@@ -366,9 +495,9 @@
             <el-table-column prop="createTime" label="下单时间" min-width="180" />
             <el-table-column label="操作" min-width="280" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="openOrderDetail(row.id)">详情</el-button>
+                <el-button size="small" @click="openOrderDetail(row)">详情</el-button>
                 <el-button
-                  v-if="Number(row.status) === 1"
+                  v-if="Number(row.orderType) === 1 && Number(row.status) === 1"
                   size="small"
                   type="success"
                   plain
@@ -377,7 +506,7 @@
                   发货
                 </el-button>
                 <el-button
-                  v-if="Number(row.status) === 2"
+                  v-if="Number(row.orderType) === 1 && Number(row.status) === 2"
                   size="small"
                   type="warning"
                   plain
@@ -386,7 +515,7 @@
                   完成
                 </el-button>
                 <el-button
-                  v-if="Number(row.status) !== 4"
+                  v-if="Number(row.orderType) === 1 && Number(row.status) !== 4"
                   size="small"
                   type="danger"
                   plain
@@ -685,6 +814,122 @@
   </el-dialog>
 
   <el-dialog
+    v-model="groupBuyDialogVisible"
+    :title="groupBuyDialogTitle"
+    width="760px"
+    destroy-on-close
+    @closed="resetGroupBuyForm"
+  >
+    <el-form
+      ref="groupBuyFormRef"
+      :model="groupBuyForm"
+      :rules="groupBuyRules"
+      label-width="110px"
+    >
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <el-form-item label="商品ID" prop="productId">
+            <el-input-number
+              v-model="groupBuyForm.productId"
+              :min="1"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              placeholder="请输入商品ID"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="拼团价" prop="groupPrice">
+            <el-input-number
+              v-model="groupBuyForm.groupPrice"
+              :min="0"
+              :precision="2"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              placeholder="请输入拼团价"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="成团人数" prop="requiredSize">
+            <el-input-number
+              v-model="groupBuyForm.requiredSize"
+              :min="2"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              placeholder="请输入成团人数"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="活动时长(小时)" prop="durationHours">
+            <el-input-number
+              v-model="groupBuyForm.durationHours"
+              :min="1"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              placeholder="请输入活动时长"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="活动库存" prop="stock">
+            <el-input-number
+              v-model="groupBuyForm.stock"
+              :min="1"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              placeholder="请输入活动库存"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="活动状态" prop="status">
+            <el-radio-group v-model="groupBuyForm.status">
+              <el-radio :label="1">进行中</el-radio>
+              <el-radio :label="0">已下架</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="开始时间" prop="startTime">
+            <el-date-picker
+              v-model="groupBuyForm.startTime"
+              type="datetime"
+              format="YYYY-MM-DD HH:mm:ss"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="可选"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="结束时间" prop="endTime">
+            <el-date-picker
+              v-model="groupBuyForm.endTime"
+              type="datetime"
+              format="YYYY-MM-DD HH:mm:ss"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="可选"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
+
+    <template #footer>
+      <el-button @click="groupBuyDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="groupBuySaving" @click="handleSaveGroupBuy">保存</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog
     v-model="deadLetterDetailVisible"
     title="异常消息详情"
     width="860px"
@@ -745,9 +990,14 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="订单号">{{ orderDetailData.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="用户ID">{{ orderDetailData.userId }}</el-descriptions-item>
+        <el-descriptions-item label="类型">
+          <el-tag :type="getOrderTypeTagType(orderDetailData.orderType)" effect="plain">
+            {{ getOrderTypeText(orderDetailData.orderType) }}
+          </el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getOrderStatusTagType(orderDetailData.status)">
-            {{ getOrderStatusText(orderDetailData.status) }}
+            {{ getOrderStatusText(orderDetailData.status, orderDetailData.orderType) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="订单金额">¥ {{ formatMoney(orderDetailData.totalAmount) }}</el-descriptions-item>
@@ -813,6 +1063,13 @@ import {
   getSeckillBuyDegradeStatus,
   refreshSeckillListCache
 } from '../api/adminSeckill'
+import {
+  addGroupBuyActivity,
+  disableGroupBuyActivity,
+  enableGroupBuyActivity,
+  getAdminGroupBuyList,
+  updateGroupBuyActivity
+} from '../api/adminGroupBuy'
 
 const router = useRouter()
 const activeMenu = ref('overview')
@@ -926,6 +1183,21 @@ const categoryMap = computed(() => {
 const productTotal = ref(0)
 const flashSaleData = ref([])
 const flashSaleTotal = ref(0)
+const groupBuyData = ref([])
+const groupBuyTotal = ref(0)
+const groupBuySearchKeyword = ref('')
+const groupBuyProductIdFilter = ref('')
+const groupBuyStatusFilter = ref('')
+const groupBuyCurrentPage = ref(1)
+const groupBuyPageSize = ref(10)
+const groupBuyLoading = ref(false)
+const groupBuySaving = ref(false)
+const groupBuyDialogVisible = ref(false)
+const groupBuyFormRef = ref(null)
+const groupBuyStatusOptions = [
+  { label: '进行中', value: 1 },
+  { label: '已下架', value: 0 }
+]
 
 const productDialogTitle = computed(() => {
   if (productForm.id) {
@@ -936,6 +1208,24 @@ const productDialogTitle = computed(() => {
 
 const categoryDialogTitle = computed(() => {
   return categoryForm.id ? '编辑分类' : '新增分类'
+})
+
+const createEmptyGroupBuyForm = () => ({
+  id: null,
+  productId: null,
+  groupPrice: null,
+  requiredSize: 2,
+  durationHours: 24,
+  stock: 0,
+  status: 1,
+  startTime: null,
+  endTime: null
+})
+
+const groupBuyForm = reactive(createEmptyGroupBuyForm())
+
+const groupBuyDialogTitle = computed(() => {
+  return groupBuyForm.id ? '编辑拼团活动' : '新增拼团活动'
 })
 
 const deadLetterStatusOptions = [
@@ -949,7 +1239,8 @@ const orderStatusOptions = [
   { label: '待发货', value: 1 },
   { label: '已发货', value: 2 },
   { label: '已完成', value: 3 },
-  { label: '已取消', value: 4 }
+  { label: '已取消', value: 4 },
+  { label: '未成团已退款', value: 5 }
 ]
 
 watch(productCurrentPage, () => {
@@ -1039,6 +1330,92 @@ const categoryRules = {
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 }
 
+const groupBuyRules = {
+  productId: [{ required: true, message: '请输入商品ID', trigger: 'change' }],
+  groupPrice: [
+    {
+      validator: (_, value, callback) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入拼团价'))
+          return
+        }
+        if (Number(value) <= 0) {
+          callback(new Error('拼团价必须大于 0'))
+          return
+        }
+        callback()
+      },
+      trigger: ['blur', 'change']
+    }
+  ],
+  requiredSize: [
+    {
+      validator: (_, value, callback) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入成团人数'))
+          return
+        }
+        if (Number(value) < 2) {
+          callback(new Error('成团人数至少为 2'))
+          return
+        }
+        callback()
+      },
+      trigger: ['blur', 'change']
+    }
+  ],
+  durationHours: [
+    {
+      validator: (_, value, callback) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入活动时长'))
+          return
+        }
+        if (Number(value) <= 0) {
+          callback(new Error('活动时长必须大于 0'))
+          return
+        }
+        callback()
+      },
+      trigger: ['blur', 'change']
+    }
+  ],
+  stock: [
+    {
+      validator: (_, value, callback) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入活动库存'))
+          return
+        }
+        if (Number(value) <= 0) {
+          callback(new Error('活动库存必须大于 0'))
+          return
+        }
+        callback()
+      },
+      trigger: ['blur', 'change']
+    }
+  ],
+  endTime: [
+    {
+      validator: (_, value, callback) => {
+        if (!value || !groupBuyForm.startTime) {
+          callback()
+          return
+        }
+        const start = parseDateTime(groupBuyForm.startTime)
+        const end = parseDateTime(value)
+        if (start && end && end <= start) {
+          callback(new Error('结束时间必须晚于开始时间'))
+          return
+        }
+        callback()
+      },
+      trigger: ['change']
+    }
+  ]
+}
+
 const fallbackCategories = [
   { id: 1, name: '数码电器', sort: 1, status: 1 },
   { id: 2, name: '家居生活', sort: 2, status: 1 },
@@ -1120,8 +1497,64 @@ const parseDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-const getOrderStatusText = (status) => {
-  switch (Number(status)) {
+const getOrderTypeText = (orderType) => {
+  switch (Number(orderType)) {
+    case 2:
+      return '秒杀'
+    case 3:
+      return '拼团'
+    default:
+      return '普通'
+  }
+}
+
+const getOrderTypeTagType = (orderType) => {
+  switch (Number(orderType)) {
+    case 2:
+      return 'danger'
+    case 3:
+      return 'warning'
+    default:
+      return 'info'
+  }
+}
+
+const getOrderStatusText = (status, orderType = 1) => {
+  const type = Number(orderType)
+  const value = Number(status)
+  if (type === 3) {
+    switch (value) {
+      case 0:
+        return '待支付'
+      case 1:
+        return '已支付待成团'
+      case 2:
+        return '已成团待发货'
+      case 3:
+        return '已完成'
+      case 4:
+        return '已取消'
+      case 5:
+        return '未成团已退款'
+      default:
+        return '未知'
+    }
+  }
+  if (type === 2) {
+    switch (value) {
+      case 0:
+        return '待支付'
+      case 1:
+        return '待发货'
+      case 2:
+        return '已取消'
+      case 3:
+        return '已完成'
+      default:
+        return '未知'
+    }
+  }
+  switch (value) {
     case 0:
       return '待支付'
     case 1:
@@ -1311,6 +1744,42 @@ watch(flashSalePageSize, (newValue, oldValue) => {
   }
 })
 
+watch(groupBuyCurrentPage, () => {
+  loadGroupBuys()
+})
+
+watch(groupBuySearchKeyword, (newValue, oldValue) => {
+  const shouldReload = groupBuyCurrentPage.value === 1
+  groupBuyCurrentPage.value = 1
+  if (shouldReload && newValue !== oldValue) {
+    loadGroupBuys()
+  }
+})
+
+watch(groupBuyProductIdFilter, (newValue, oldValue) => {
+  const shouldReload = groupBuyCurrentPage.value === 1
+  groupBuyCurrentPage.value = 1
+  if (shouldReload && newValue !== oldValue) {
+    loadGroupBuys()
+  }
+})
+
+watch(groupBuyStatusFilter, (newValue, oldValue) => {
+  const shouldReload = groupBuyCurrentPage.value === 1
+  groupBuyCurrentPage.value = 1
+  if (shouldReload && newValue !== oldValue) {
+    loadGroupBuys()
+  }
+})
+
+watch(groupBuyPageSize, (newValue, oldValue) => {
+  const shouldReload = groupBuyCurrentPage.value === 1
+  groupBuyCurrentPage.value = 1
+  if (shouldReload && newValue !== oldValue) {
+    loadGroupBuys()
+  }
+})
+
 watch(orderCurrentPage, () => {
   loadOrders()
 })
@@ -1384,6 +1853,24 @@ const normalizeCategory = (item) => ({
   status: item.status ?? 1
 })
 
+const normalizeGroupBuy = (item) => ({
+  id: item.id,
+  productId: item.productId ?? item.product_id ?? null,
+  productName: item.productName || item.product_name || '',
+  categoryName: item.categoryName || item.category_name || '',
+  productPrice: item.productPrice ?? item.product_price ?? null,
+  groupPrice: item.groupPrice ?? item.group_price ?? null,
+  requiredSize: item.requiredSize ?? item.required_size ?? 2,
+  durationHours: item.durationHours ?? item.duration_hours ?? 24,
+  stock: item.stock ?? 0,
+  status: Number(item.status ?? 1),
+  statusText: item.statusText || item.status_text || (Number(item.status ?? 1) === 1 ? '进行中' : '已下架'),
+  startTime: item.startTime ?? item.start_time ?? null,
+  endTime: item.endTime ?? item.end_time ?? null,
+  createTime: item.createTime ?? item.create_time ?? null,
+  updateTime: item.updateTime ?? item.update_time ?? null
+})
+
 const loadCategories = async () => {
   try {
     const res = await getCategoryList()
@@ -1434,6 +1921,44 @@ const loadProducts = async () => {
     productTotal.value = fallbackProducts.length
   } finally {
     productLoading.value = false
+  }
+}
+
+const loadGroupBuys = async () => {
+  groupBuyLoading.value = true
+  try {
+    const productId =
+      groupBuyProductIdFilter.value === '' ||
+      groupBuyProductIdFilter.value === null ||
+      groupBuyProductIdFilter.value === undefined
+        ? undefined
+        : Number(groupBuyProductIdFilter.value)
+    const status =
+      groupBuyStatusFilter.value === '' ||
+      groupBuyStatusFilter.value === null ||
+      groupBuyStatusFilter.value === undefined
+        ? undefined
+        : Number(groupBuyStatusFilter.value)
+    const res = await getAdminGroupBuyList({
+      keyword: groupBuySearchKeyword.value.trim() || undefined,
+      productId,
+      status,
+      page: groupBuyCurrentPage.value,
+      size: groupBuyPageSize.value
+    })
+    if (res.code === 200 && res.data) {
+      const list = Array.isArray(res.data.list) ? res.data.list : []
+      groupBuyData.value = list.map(normalizeGroupBuy)
+      groupBuyTotal.value = Number(res.data.total) || 0
+      return
+    }
+    groupBuyData.value = []
+    groupBuyTotal.value = 0
+  } catch {
+    groupBuyData.value = []
+    groupBuyTotal.value = 0
+  } finally {
+    groupBuyLoading.value = false
   }
 }
 
@@ -1556,7 +2081,8 @@ const normalizeOrder = (item) => ({
   userId: item.userId ?? item.user_id ?? null,
   totalAmount: item.totalAmount ?? item.total_amount ?? 0,
   status: Number(item.status ?? 0),
-  statusText: item.statusText || item.status_text || getOrderStatusText(item.status),
+  orderType: Number(item.orderType ?? item.order_type ?? 1),
+  statusText: item.statusText || item.status_text || getOrderStatusText(item.status, item.orderType ?? item.order_type ?? 1),
   createTime: item.createTime ?? item.create_time ?? null,
   updateTime: item.updateTime ?? item.update_time ?? null,
   items: Array.isArray(item.items) ? item.items.map(normalizeOrderItem) : []
@@ -1568,7 +2094,8 @@ const normalizeOrderDetail = (item) => ({
   userId: item.userId ?? item.user_id ?? null,
   totalAmount: item.totalAmount ?? item.total_amount ?? 0,
   status: Number(item.status ?? 0),
-  statusText: item.statusText || item.status_text || getOrderStatusText(item.status),
+  orderType: Number(item.orderType ?? item.order_type ?? 1),
+  statusText: item.statusText || item.status_text || getOrderStatusText(item.status, item.orderType ?? item.order_type ?? 1),
   createTime: item.createTime ?? item.create_time ?? null,
   updateTime: item.updateTime ?? item.update_time ?? null,
   items: Array.isArray(item.items) ? item.items.map(normalizeOrderItem) : []
@@ -1706,10 +2233,12 @@ const handleMarkDeadLetterDone = async (row) => {
   }
 }
 
-const openOrderDetail = async (id) => {
+const openOrderDetail = async (order) => {
   orderDetailLoading.value = true
   try {
-    const res = await getAdminOrderDetail(id)
+    const orderId = typeof order === 'object' ? order.id : order
+    const orderType = typeof order === 'object' ? order.orderType : undefined
+    const res = await getAdminOrderDetail(orderId, orderType)
     if (res.code === 200 && res.data) {
       orderDetailData.value = normalizeOrderDetail(res.data)
       orderDetailVisible.value = true
@@ -1742,7 +2271,7 @@ const handleChangeOrderStatus = async (row, targetStatus) => {
     ElMessage.success('订单状态已更新')
     await loadOrders()
     if (orderDetailVisible.value && orderDetailData.value?.id === row.id) {
-      await openOrderDetail(row.id)
+      await openOrderDetail(row)
     }
   } catch {
     row.status = targetStatus
@@ -1770,7 +2299,7 @@ const handleCancelOrder = async (row) => {
     ElMessage.success('订单已取消')
     await loadOrders()
     if (orderDetailVisible.value && orderDetailData.value?.id === row.id) {
-      await openOrderDetail(row.id)
+      await openOrderDetail(row)
     }
   } catch {
     row.status = 4
@@ -1864,6 +2393,116 @@ const handleSaveCategory = async () => {
     categoryDialogVisible.value = false
   } finally {
     categorySaving.value = false
+  }
+}
+
+const resetGroupBuyForm = () => {
+  Object.assign(groupBuyForm, createEmptyGroupBuyForm())
+  if (groupBuyFormRef.value) {
+    groupBuyFormRef.value.clearValidate()
+  }
+}
+
+const openAddGroupBuyDialog = () => {
+  resetGroupBuyForm()
+  groupBuyDialogVisible.value = true
+}
+
+const openEditGroupBuyDialog = (row) => {
+  resetGroupBuyForm()
+  Object.assign(groupBuyForm, normalizeGroupBuy(row))
+  groupBuyDialogVisible.value = true
+}
+
+const refreshGroupBuys = async () => {
+  await loadGroupBuys()
+}
+
+const toggleGroupBuyStatus = async (row) => {
+  const shouldEnable = Number(row.status) !== 1
+  const actionText = shouldEnable ? '上架' : '下架'
+  const confirmText = shouldEnable
+    ? `确定上架拼团活动「${row.productName || row.productId}」吗？`
+    : `确定下架拼团活动「${row.productName || row.productId}」吗？`
+
+  try {
+    await ElMessageBox.confirm(confirmText, '提示', {
+      type: 'warning',
+      confirmButtonText: actionText,
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+
+  try {
+    const res = shouldEnable ? await enableGroupBuyActivity(row.id) : await disableGroupBuyActivity(row.id)
+    if (res.code !== 200) {
+      throw new Error(res.message || '操作失败')
+    }
+    ElMessage.success(`${actionText}成功`)
+    await loadGroupBuys()
+  } catch {
+    row.status = shouldEnable ? 1 : 0
+    row.statusText = shouldEnable ? '进行中' : '已下架'
+    ElMessage.warning('接口暂不可用，已先同步当前页面状态')
+  }
+}
+
+const handleSaveGroupBuy = async () => {
+  if (!groupBuyFormRef.value) {
+    return
+  }
+
+  const valid = await groupBuyFormRef.value.validate().catch(() => false)
+  if (!valid) {
+    return
+  }
+
+  const payload = {
+    ...groupBuyForm,
+    productId: Number(groupBuyForm.productId),
+    groupPrice: Number(groupBuyForm.groupPrice),
+    requiredSize: Number(groupBuyForm.requiredSize),
+    durationHours: Number(groupBuyForm.durationHours),
+    stock: Number(groupBuyForm.stock),
+    status: Number(groupBuyForm.status) || 0,
+    startTime: groupBuyForm.startTime || null,
+    endTime: groupBuyForm.endTime || null
+  }
+
+  if (payload.endTime && payload.startTime) {
+    const start = parseDateTime(payload.startTime)
+    const end = parseDateTime(payload.endTime)
+    if (start && end && end <= start) {
+      ElMessage.warning('结束时间必须晚于开始时间')
+      return
+    }
+  }
+
+  groupBuySaving.value = true
+  try {
+    const res = payload.id ? await updateGroupBuyActivity(payload) : await addGroupBuyActivity(payload)
+    if (res.code !== 200) {
+      throw new Error(res.message || '保存失败')
+    }
+    ElMessage.success(payload.id ? '拼团活动已更新' : '拼团活动已新增')
+    groupBuyDialogVisible.value = false
+    await loadGroupBuys()
+  } catch {
+    const normalized = normalizeGroupBuy(payload)
+    if (payload.id) {
+      groupBuyData.value = groupBuyData.value.map(item =>
+        Number(item.id) === Number(payload.id) ? normalized : item
+      )
+    } else {
+      groupBuyData.value = [normalized, ...groupBuyData.value]
+      groupBuyTotal.value += 1
+    }
+    ElMessage.warning('接口暂不可用，已先更新当前页面数据')
+    groupBuyDialogVisible.value = false
+  } finally {
+    groupBuySaving.value = false
   }
 }
 
@@ -2097,6 +2736,9 @@ watch(activeMenu, (newVal) => {
     loadFlashSaleProducts()
     loadSeckillBuyDegradeStatus()
   }
+  if (newVal === 'groupBuy') {
+    loadGroupBuys()
+  }
   if (newVal === 'deadLetter') {
     refreshDeadLetters()
   }
@@ -2145,6 +2787,7 @@ onMounted(async () => {
     loadAdminCategories(),
     loadProducts(),
     loadFlashSaleProducts(),
+    loadGroupBuys(),
     loadOrders(),
     loadDeadLetterPendingCount()
   ])

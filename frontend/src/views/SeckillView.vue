@@ -73,7 +73,7 @@
                 shadow="hover"
                 :body-style="{ padding: '0px' }"
               >
-                <div class="card-image">
+                <div class="card-image clickable-image" @click="goToProductDetail(item.id)">
                   <template v-if="item.image">
                     <img :src="item.image" :alt="item.name" />
                   </template>
@@ -131,7 +131,7 @@
                   </div>
 
                   <div class="action-row">
-                    <el-button size="small" @click="selectProduct(item)">查看详情</el-button>
+                    <el-button size="small" @click.stop="goToProductDetail(item.id)">查看详情</el-button>
                     <el-button
                       type="danger"
                       size="small"
@@ -601,10 +601,12 @@ const requestTagType = (status) => {
   return 'warning'
 }
 
+const goToProductDetail = (productId) => {
+  router.push(`/product/${productId}`)
+}
+
 const selectProduct = async (product) => {
-  selectedProductId.value = product.id
-  await nextTick()
-  document.getElementById(`seckill-card-${product.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  goToProductDetail(product.id)
 }
 
 const handleBuy = async (product) => {
@@ -984,6 +986,10 @@ onBeforeUnmount(() => {
 .seckill-card.active {
   border-color: #f56c6c;
   box-shadow: 0 10px 24px rgba(245, 108, 108, 0.15);
+}
+
+.clickable-image {
+  cursor: pointer;
 }
 
 .card-image {
